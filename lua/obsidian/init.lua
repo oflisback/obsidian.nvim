@@ -77,8 +77,33 @@ obsidian.setup = function(opts)
   -- Register commands.
   require("obsidian.command").register_all(self)
 
+  local function get_vault_path(path)
+    local current_path = vim.fn.expand(path)
+    while current_path ~= "/" do
+      local obsidian_folder = current_path .. "/.obsidian"
+      if vim.fn.isdirectory(obsidian_folder) == 1 then
+        return current_path
+      end
+      current_path = vim.fn.fnamemodify(current_path, ":h")
+    end
+    return nil
+  end
+
   -- Complete the lazy setup only when entering a buffer in the vault.
   local lazy_setup = function()
+    local bufnr = vim.api.nvim_get_current_buf()
+    local filename_incl_path = vim.api.nvim_buf_get_name(bufnr)
+    if filename_incl_path == nil or string.sub(filename_incl_path, -3) ~= ".md" then
+      return nil
+    end
+    local path = vim.fn.fnamemodify(filename_incl_path, ":p:h")
+    local vault_path = get_vault_path(path)
+    if vault_path == nil then
+      return nil
+    end
+
+    self.dir = Path:new(vim.fs.normalize(vault_path))
+
     -- Configure completion...
     if opts.completion.nvim_cmp then
       -- Add source.
@@ -139,7 +164,7 @@ obsidian.setup = function(opts)
   -- Complete lazy setup on BufEnter
   vim.api.nvim_create_autocmd({ "BufEnter" }, {
     group = group,
-    pattern = tostring(self.dir / "**.md"),
+    pattern = tostring "**.md",
     callback = lazy_setup,
   })
 
